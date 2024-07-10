@@ -15,6 +15,9 @@ local pl = lazy.access(utils, "path") ---@type PathLib
 local api = vim.api
 local M = {}
 
+-- keymaps to restore
+local R = {}
+
 local HAS_NVIM_0_10 = vim.fn.has("nvim-0.10") == 1
 
 ---@alias git.FileDataProducer fun(kind: vcs.FileKind, path: string, pos: "left"|"right"): string[]
@@ -350,8 +353,53 @@ function File:attach_buffer(force, opt)
       state.keymaps = config.extend_keymaps(conf.keymaps.view, state.keymaps)
       local default_map_opt = { silent = true, nowait = true, buffer = self.bufnr }
 
+      R = {}
+
       for _, mapping in ipairs(state.keymaps) do
         local map_opt = vim.tbl_extend("force", default_map_opt, mapping[4] or {}, { buffer = self.bufnr })
+
+        local mode = mapping[1] -- string
+        local name_lhs = mapping[2] -- string
+
+        local lhs_pat = string.format("%s", name_lhs)
+        -- escape special characters for search pattern
+        lhs_pat = string.gsub(lhs_pat, "%[", "%%%[")
+        lhs_pat = string.gsub(lhs_pat, "%]", "%%%]")
+
+        -- force focus buffer
+        -- vim.api.nvim_set_current_buf(self.bufnr)
+        --
+        -- if not focussed on corresponding buffer
+        -- this function does not return correct buffer keymaps
+        local buf_mappings = vim.api.nvim_buf_get_keymap(self.bufnr, mode)
+
+        for _, buf_km_dict in pairs(buf_mappings) do
+          if buf_km_dict["lhs"] ~= nil then
+            local result = string.find(buf_km_dict["lhs"], lhs_pat)
+
+            if result ~= nil and result ~= "" then
+              -- get keymap associated with buffer
+              local dict = vim.fn.maparg(name_lhs, mode, 0, 1)
+              if dict ~= nil then
+                -- save buffer keymap
+                if dict.buffer == 1 then
+                  local obj = {
+                    bufnr = self.bufnr,
+                    mode = mode,
+                    abbr = 0,
+                    km_dict = dict,
+                  }
+                  table.insert(R, obj)
+                end
+              end
+              -- found buffer keymap, so stop searching
+              do
+                break
+              end
+            end
+          end
+        end
+
         vim.keymap.set(mapping[1], mapping[2], mapping[3], map_opt)
       end
 
@@ -384,6 +432,13 @@ function File:detach_buffer()
           end
         else
           pcall(api.nvim_buf_del_keymap, self.bufnr, "n", lhs)
+        end
+      end
+
+      -- restore buffer keymaps
+      for _, dict in pairs(R) do
+        if dict.bufnr == self.bufnr then
+          vim.fn.mapset(dict.mode, 0, dict.km_dict)
         end
       end
 
