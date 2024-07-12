@@ -366,11 +366,6 @@ function File:attach_buffer(force, opt)
         lhs_pat = string.gsub(lhs_pat, "%[", "%%%[")
         lhs_pat = string.gsub(lhs_pat, "%]", "%%%]")
 
-        -- force focus buffer
-        -- vim.api.nvim_set_current_buf(self.bufnr)
-        --
-        -- if not focussed on corresponding buffer
-        -- this function does not return correct buffer keymaps
         local buf_mappings = vim.api.nvim_buf_get_keymap(self.bufnr, mode)
 
         for _, buf_km_dict in pairs(buf_mappings) do
@@ -378,19 +373,14 @@ function File:attach_buffer(force, opt)
             local result = string.find(buf_km_dict["lhs"], lhs_pat)
 
             if result ~= nil and result ~= "" then
-              -- get keymap associated with buffer
-              local dict = vim.fn.maparg(name_lhs, mode, 0, 1)
-              if dict ~= nil then
-                -- save buffer keymap
-                if dict.buffer == 1 then
-                  local obj = {
-                    bufnr = self.bufnr,
-                    mode = mode,
-                    abbr = 0,
-                    km_dict = dict,
-                  }
-                  table.insert(R, obj)
-                end
+              -- save buffer keymap
+              if buf_km_dict.buffer == self.bufnr then
+                local obj = {
+                  bufnr = self.bufnr,
+                  mode = mode,
+                  km_dict = buf_km_dict,
+                }
+                table.insert(R, obj)
               end
               -- found buffer keymap, so stop searching
               do
@@ -435,12 +425,18 @@ function File:detach_buffer()
         end
       end
 
+      local orig_bufnr = vim.fn.bufnr()
       -- restore buffer keymaps
       for _, dict in pairs(R) do
         if dict.bufnr == self.bufnr then
+          -- switch to required buffer to restore keymap to
+          vim.api.nvim_set_current_buf(self.bufnr)
           vim.fn.mapset(dict.mode, 0, dict.km_dict)
         end
       end
+
+      -- switch back to original buffer
+      vim.api.nvim_set_current_buf(orig_bufnr)
 
       -- Diagnostics
       if state.disable_diagnostics then
