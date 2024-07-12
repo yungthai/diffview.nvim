@@ -366,7 +366,7 @@ function File:attach_buffer(force, opt)
         lhs_pat = string.gsub(lhs_pat, "%[", "%%%[")
         lhs_pat = string.gsub(lhs_pat, "%]", "%%%]")
 
-        local buf_mappings = vim.api.nvim_buf_get_keymap(self.bufnr, mode)
+        local buf_mappings = api.nvim_buf_get_keymap(self.bufnr, mode)
 
         for _, buf_km_dict in pairs(buf_mappings) do
           if buf_km_dict["lhs"] ~= nil then
@@ -430,13 +430,13 @@ function File:detach_buffer()
       for _, dict in pairs(R) do
         if dict.bufnr == self.bufnr then
           -- switch to required buffer to restore keymap to
-          vim.api.nvim_set_current_buf(self.bufnr)
-          vim.fn.mapset(dict.mode, 0, dict.km_dict)
+          pcall(api.nvim_set_current_buf, self.bufnr)
+          pcall(vim.fn.mapset, dict.mode, 0, dict.km_dict)
         end
       end
 
       -- switch back to original buffer
-      vim.api.nvim_set_current_buf(orig_bufnr)
+      pcall(api.nvim_set_current_buf, orig_bufnr)
 
       -- Diagnostics
       if state.disable_diagnostics then
