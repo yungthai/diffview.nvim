@@ -373,12 +373,25 @@ function File:attach_buffer(force, opt)
             local result = string.find(buf_km_dict["lhs"], lhs_pat)
 
             if result ~= nil and result ~= "" then
+              local rhs = ""
+              if buf_km_dict.rhs ~= nil then
+                rhs = buf_km_dict.rhs
+              else
+                rhs = buf_km_dict.callback
+              end
               -- save buffer keymap
               if buf_km_dict.buffer == self.bufnr then
                 local obj = {
                   bufnr = self.bufnr,
                   mode = mode,
-                  km_dict = buf_km_dict,
+                  lhs = name_lhs,
+                  rhs = rhs,
+                  opts = {
+                    buffer = self.bufnr,
+                    desc = buf_km_dict["desc"],
+                    silent = buf_km_dict["silent"],
+                    noremap = buf_km_dict["noremap"],
+                  },
                 }
                 table.insert(R, obj)
               end
@@ -425,18 +438,12 @@ function File:detach_buffer()
         end
       end
 
-      local orig_bufnr = vim.fn.bufnr()
       -- restore buffer keymaps
       for _, dict in pairs(R) do
         if dict.bufnr == self.bufnr then
-          -- switch to required buffer to restore keymap to
-          pcall(api.nvim_set_current_buf, self.bufnr)
-          pcall(vim.fn.mapset, dict.mode, 0, dict.km_dict)
+          vim.keymap.set(dict.mode, dict.lhs, dict.rhs, dict.opts)
         end
       end
-
-      -- switch back to original buffer
-      pcall(api.nvim_set_current_buf, orig_bufnr)
 
       -- Diagnostics
       if state.disable_diagnostics then
