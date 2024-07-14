@@ -368,33 +368,30 @@ function File:attach_buffer(force, opt)
 
         local buf_mappings = api.nvim_buf_get_keymap(self.bufnr, mode)
 
-        for _, buf_km_dict in pairs(buf_mappings) do
-          if buf_km_dict["lhs"] ~= nil then
-            local result = string.find(buf_km_dict["lhs"], lhs_pat)
+        for _, buf_km in pairs(buf_mappings) do
+          if buf_km.lhs ~= nil then
+            local result = string.find(buf_km.lhs, lhs_pat)
 
-            if result ~= nil and result ~= "" then
+            if result ~= nil then
               local rhs = ""
-              if buf_km_dict.rhs ~= nil then
-                rhs = buf_km_dict.rhs
+              if buf_km.rhs ~= nil then
+                rhs = buf_km.rhs
               else
-                rhs = buf_km_dict.callback
+                rhs = buf_km.callback
               end
-              -- save buffer keymap
-              if buf_km_dict.buffer == self.bufnr then
-                local obj = {
-                  bufnr = self.bufnr,
-                  mode = mode,
-                  lhs = name_lhs,
-                  rhs = rhs,
-                  opts = {
-                    buffer = self.bufnr,
-                    desc = buf_km_dict["desc"],
-                    silent = buf_km_dict["silent"],
-                    noremap = buf_km_dict["noremap"],
-                  },
-                }
-                table.insert(R, obj)
-              end
+              -- save original buffer keymap
+              local orig_km = {
+                mode = mode,
+                lhs = name_lhs,
+                rhs = rhs,
+                opts = {
+                  buffer = self.bufnr,
+                  desc = buf_km.desc,
+                  silent = buf_km.silent,
+                  noremap = buf_km.noremap,
+                },
+              }
+              table.insert(R, orig_km)
               -- found buffer keymap, so stop searching
               do
                 break
@@ -438,10 +435,10 @@ function File:detach_buffer()
         end
       end
 
-      -- restore buffer keymaps
-      for _, dict in pairs(R) do
-        if dict.bufnr == self.bufnr then
-          vim.keymap.set(dict.mode, dict.lhs, dict.rhs, dict.opts)
+      -- restore original buffer keymaps
+      for _, km in pairs(R) do
+        if km.opts.buffer == self.bufnr then
+          vim.keymap.set(km.mode, km.lhs, km.rhs, km.opts)
         end
       end
 
